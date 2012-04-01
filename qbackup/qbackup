@@ -1,0 +1,126 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+
+import sys
+import os
+import re
+import time
+import config
+import smtplib
+from email.mime.text import MIMEText
+
+# build nickname->qq & realname->qq map
+nickname2qq_map = {}
+realname2qq_map = {}
+for i in config.QQ_USER_DICT.items():
+    nickname2qq_map[i[1][0]] = i[0]
+    realname2qq_map[i[1][1]] = i[0]
+
+def backup_qq_msg_file(filename):
+    # parse chat records by user
+    records = []
+    stat = 0
+    counter = 0
+    qq_info = None
+    chats = ''
+    chat_date = ''
+    line_num = 0
+    pattern1 = re.compile('^={64}\r{0,1}$')
+    pattern2 = re.compile('消息对象:(.*)')
+    pattern3 = re.compile('^(\d{4}-\d{1,2}-\d{1,2}) (\d{1,2}:\d{2}:\d{2}) (.*)$')
+    for raw_line in open(filename):
+        line_num = line_num + 1
+
+        # truncate trailing '\r'
+        line = raw_line.replace('\r\n', '\n')
+
+        if pattern1.match(line):
+            stat = stat + 1
+            if stat == 4: stat = 1
+            continue
+
+        if stat == 1:
+            # reset
+            if counter != 0: 
+                records.append((qq_info, chats))
+            qq_info = None
+            chats = ''
+            chat_date = ''
+            counter = 0
+        elif stat == 2:
+            name = pattern2.search(line).group(1)
+            if name in realname2qq_map:
+                qq = realname2qq_map[name]
+            elif name in nickname2qq_map:
+                qq = nickname2qq_map[name]
+            else:
+                qq_info = ('...', None, name)
+                continue
+            u = config.QQ_USER_DICT[qq]
+            qq_info = (qq, u[0], u[1])
+        elif stat == 3:
+            if qq_info is None:
+                continue
+
+            m = pattern3.match(line)
+            if m:
+                if chat_date != m.group(1): 
+                    chat_date = m.group(1)
+                    line = '日期: ' + chat_date + '\n' + '='*32 + '\n'
+                else:
+                    line = ''
+                if qq_info[1] == m.group(3):
+                    line = line + qq_info[2] + ' ' + m.group(2) + '\n'
+                else:
+                    line = line + m.group(3) + ' ' + m.group(2) + '\n'
+
+            chats = chats + line
+            if line != '\n':
+                counter = counter + 1
+
+            # split chats if it is too long
+            if counter > 2000 and line == '\n':
+                records.append((qq_info, chats))
+                chats = ''
+                chat_date = ''
+                counter = 0
+    if counter != 0: records.append((qq_info, chats))
+    print 'Total: %d lines, %d mail needed' % (line_num, len(records))
+
+#    for item in records:
+#        print '+'*16 + str(item[0]) + '+'*16
+#        print item[1] 
+
+    # backup chat records
+    print 'Connecting to ' + config.SMTP_HOST
+    s = smtplib.SMTP()
+    s.connect(config.SMTP_HOST)
+    s.login(config.SMTP_USR, config.SMTP_PWD)
+    
+    current = 1
+    total = len(records)
+    for item in records:
+        # print '\r[%d/%d]: backing chat with %s(%s)\033[K' % (current, total, item[0][2], item[0][0]),
+        print '[%d/%d]: backuping chat with %s(%s)' % (current, total, item[0][2], item[0][0])
+
+        msg = MIMEText(item[1])
+        msg['From'] = config.MAIL_FROM
+        msg['To'] = config.MAIL_TO
+        msg['Subject'] = 'Chat with %s(%s)' % (item[0][2], item[0][0])
+        s.sendmail(config.SMTP_USR, config.BACKUP_EMAIL, msg.as_string())
+
+        current = current + 1
+        time.sleep(1)
+    print 'LOL, all the work is done!'
+
+    s.close()
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        argv0 = os.path.basename(sys.argv[0])
+        print "Usage: %s file ..." % argv0
+        exit(1)
+
+    for file in sys.argv[1:]:
+        backup_qq_msg_file(file)
+
