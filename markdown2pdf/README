@@ -1,0 +1,3 @@
+Script I used to build 6-inch pdf book for Kindle.
+
+sudo apt-get install pandoc texlive-xetex latex-cjk-chinese latex-cjk-xcjk texlive-latex-recommended
