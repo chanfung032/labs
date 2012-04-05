@@ -10,42 +10,56 @@ import sys
 import struct
 import locale
 
+input = open(sys.argv[1], 'rb')
+
 ASCII, ESCAPE, GB1, GB2 = range(4)
 
-input = open(sys.argv[1], 'rb').read()
+default_enc = locale.getpreferredencoding()
 
-buf = []
-mode = ASCII
-for c in input:
-    if mode == ASCII:
-        if c == '~':
-            mode = ESCAPE
-        else:
-            buf.append(c)
-    elif mode == ESCAPE:
-        if c == '{':
-            mode = GB1
-        elif c == '}':
-            mode = ASCII
-        elif c == '~':
-            buf.append(c)
-            mode = ASCII
-        elif c == '\n':
-            buf.append(c)
-            mode = ASCII
-        else:
-            raise ValueError("invalid character sequence")
-    elif mode == GB1:
-        if c == '~':
-            mode = ESCAPE
-        else:
+for line in input.readlines():
+    buf = []
+    mode = ASCII
+    pos = 0
+    line = line.rstrip()
+
+    for c in line:
+        if mode == ASCII:
+            if c == '~':
+                mode = ESCAPE
+            else:
+                buf.append(c)
+        elif mode == ESCAPE:
+            if c == '{':
+                mode = GB1
+            elif c == '}':
+                mode = ASCII
+            elif c == '~':
+                buf.append(c)
+                mode = ASCII
+            elif c == '\n':
+                buf.append(c)
+                mode = ASCII
+            else:
+                print line
+                raise ValueError("invalid character at pos %d" % pos)
+        elif mode == GB1:
+            if c == '~':
+                mode = ESCAPE
+            else:
+                buf.append(struct.pack('B', 0x80 | ord(c)))
+                mode = GB2
+        elif mode == GB2:
             buf.append(struct.pack('B', 0x80 | ord(c)))
-            mode = GB2
-    elif mode == GB2:
-        buf.append(struct.pack('B', 0x80 | ord(c)))
-        mode = GB1
+            mode = GB1
 
-gb_text = ''.join(buf)
-output = gb_text.decode('gb2312').encode(locale.getpreferredencoding())
-print output
+        pos = pos + 1
+
+    try:
+        gb_text = ''.join(buf)
+        output = gb_text.decode('gb2312').encode(default_enc)
+    except:
+        print line
+        raise
+
+    print output
 
