@@ -31,6 +31,7 @@ for c in input:
             buf.append(c)
             mode = ASCII
         elif c == '\n':
+            buf.append(c)
             mode = ASCII
         else:
             raise ValueError("invalid character sequence")
