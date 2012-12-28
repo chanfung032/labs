@@ -105,7 +105,8 @@ class Generator:
     def _subpattern(self, item):
         s = self._(item[1])
         # save for backreference
-        self._groups[item[0]] = s
+        if item[0] is not None:
+            self._groups[item[0]] = s
         return s
 
     def _branch(self, item):
