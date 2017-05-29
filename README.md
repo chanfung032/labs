@@ -16,5 +16,6 @@
 
 - https://blog.chaitin.cn/sqlchop-the-sqli-detection-engine/
 - [Creation Of LR Parser Table](https://www.youtube.com/watch?v=wwc3pUUahJk)
+- https://c9x.me/yacc/
 - https://www.cs.umd.edu/class/spring2014/cmsc430/lectures/lec07.pdf
 - http://www3.cs.stonybrook.edu/~cse304/Fall08/Lectures/lrparser-handout.pdf

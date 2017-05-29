@@ -1,4 +1,7 @@
 /*
+Modified from golang/tools/goyacc
+https://github.com/golang/tools/blob/master/cmd/goyacc/yacc.go
+
 Derived from Inferno's utils/iyacc/yacc.c
 http://code.google.com/p/inferno-os/source/browse/utils/iyacc/yacc.c
 
@@ -656,22 +659,22 @@ outer:
 		mem++
 
 		// check that default action is reasonable
-		if ntypes != 0 && (levprd[nprod]&ACTFLAG) == 0 &&
-			nontrst[curprod[0]-NTBASE].value != 0 {
-			// no explicit action, LHS has value
-			tempty := curprod[1]
-			if tempty < 0 {
-				lerrorf(ruleline, "must return a value, since LHS has a type")
-			}
-			if tempty >= NTBASE {
-				tempty = nontrst[tempty-NTBASE].value
-			} else {
-				tempty = TYPE(toklev[tempty])
-			}
-			if tempty != nontrst[curprod[0]-NTBASE].value {
-				lerrorf(ruleline, "default action causes potential type clash")
-			}
-		}
+		//if ntypes != 0 && (levprd[nprod]&ACTFLAG) == 0 &&
+		//	nontrst[curprod[0]-NTBASE].value != 0 {
+		//	// no explicit action, LHS has value
+		//	tempty := curprod[1]
+		//	if tempty < 0 {
+		//		lerrorf(ruleline, "must return a value, since LHS has a type")
+		//	}
+		//	if tempty >= NTBASE {
+		//		tempty = nontrst[tempty-NTBASE].value
+		//	} else {
+		//		tempty = TYPE(toklev[tempty])
+		//	}
+		//	if tempty != nontrst[curprod[0]-NTBASE].value {
+		//		lerrorf(ruleline, "default action causes potential type clash")
+		//	}
+		//}
 		moreprod()
 		prdptr[nprod] = make([]int, mem)
 		copy(prdptr[nprod], curprod)
@@ -1128,6 +1131,7 @@ func emitcode(code []rune, lineno int) {
 		writecode(line)
 		if !fmtImported && isPackageClause(line) {
 			fmt.Fprintln(ftable, `import __yyfmt__ "fmt"`)
+			fmt.Fprintln(ftable, `import "strings"`)
 			if !lflag {
 				fmt.Fprintf(ftable, "//line %v:%v\n\t\t", infile, lineno+i)
 			}
@@ -2819,6 +2823,9 @@ nextn:
 func aoutput() {
 	ftable.WriteRune('\n')
 	fmt.Fprintf(ftable, "const %sLast = %v\n\n", prefix, maxa+1)
+	fmt.Fprintf(ftable, "const %sNstate = %v\n\n", prefix, nstate)
+	fmt.Fprintf(ftable, "const %sNtokens = %v\n\n", prefix, ntokens)
+	fmt.Fprintf(ftable, "const %sNnonter = %v\n\n", prefix, nnonter)
 	arout("Act", amem, maxa+1)
 	arout("Pact", indgo, nstate)
 	arout("Pgo", pgo, nnonter+1)
@@ -2927,17 +2934,17 @@ func others() {
 
 	// Custom error messages.
 	fmt.Fprintf(ftable, "\n")
-	fmt.Fprintf(ftable, "var %sErrorMessages = [...]struct {\n", prefix)
-	fmt.Fprintf(ftable, "\tstate int\n")
-	fmt.Fprintf(ftable, "\ttoken int\n")
-	fmt.Fprintf(ftable, "\tmsg   string\n")
-	fmt.Fprintf(ftable, "}{\n")
-	for _, error := range errors {
-		lineno = error.lineno
-		state, token := runMachine(error.tokens)
-		fmt.Fprintf(ftable, "\t{%v, %v, %s},\n", state, token, error.msg)
-	}
-	fmt.Fprintf(ftable, "}\n")
+	//fmt.Fprintf(ftable, "var %sErrorMessages = [...]struct {\n", prefix)
+	//fmt.Fprintf(ftable, "\tstate int\n")
+	//fmt.Fprintf(ftable, "\ttoken int\n")
+	//fmt.Fprintf(ftable, "\tmsg   string\n")
+	//fmt.Fprintf(ftable, "}{\n")
+	//for _, error := range errors {
+	//	lineno = error.lineno
+	//	state, token := runMachine(error.tokens)
+	//	fmt.Fprintf(ftable, "\t{%v, %v, %s},\n", state, token, error.msg)
+	//}
+	//fmt.Fprintf(ftable, "}\n")
 
 	// copy parser text
 	ch := getrune(finput)
@@ -3261,12 +3268,12 @@ var yaccpartext = `
 /*	parser for yacc output	*/
 
 var (
-	$$Debug        = 0
+	$$Debug        = 3
 	$$ErrorVerbose = false
 )
 
 type $$Lexer interface {
-	Lex(lval *$$SymType) int
+	Lex(yylval *$$SymType) int
 	Error(s string)
 }
 
@@ -3277,7 +3284,7 @@ type $$Parser interface {
 
 type $$ParserImpl struct {
 	lval  $$SymType
-	stack [$$InitialStackSize]$$SymType
+	tokens [][2]int
 	char  int
 }
 
@@ -3297,7 +3304,7 @@ func $$Tokname(c int) string {
 			return $$Toknames[c-1]
 		}
 	}
-	return __yyfmt__.Sprintf("tok-%v", c)
+	return __yyfmt__.Sprintf("tok:%v", c)
 }
 
 func $$Statname(s int) string {
@@ -3306,71 +3313,7 @@ func $$Statname(s int) string {
 			return $$Statenames[s]
 		}
 	}
-	return __yyfmt__.Sprintf("state-%v", s)
-}
-
-func $$ErrorMessage(state, lookAhead int) string {
-	const TOKSTART = 4
-
-	if !$$ErrorVerbose {
-		return "syntax error"
-	}
-
-	for _, e := range $$ErrorMessages {
-		if e.state == state && e.token == lookAhead {
-			return "syntax error: " + e.msg
-		}
-	}
-
-	res := "syntax error: unexpected " + $$Tokname(lookAhead)
-
-	// To match Bison, suggest at most four expected tokens.
-	expected := make([]int, 0, 4)
-
-	// Look for shiftable tokens.
-	base := $$Pact[state]
-	for tok := TOKSTART; tok-1 < len($$Toknames); tok++ {
-		if n := base + tok; n >= 0 && n < $$Last && $$Chk[$$Act[n]] == tok {
-			if len(expected) == cap(expected) {
-				return res
-			}
-			expected = append(expected, tok)
-		}
-	}
-
-	if $$Def[state] == -2 {
-		i := 0
-		for $$Exca[i] != -1 || $$Exca[i+1] != state {
-			i += 2
-		}
-
-		// Look for tokens that we accept or reduce.
-		for i += 2; $$Exca[i] >= 0; i += 2 {
-			tok := $$Exca[i]
-			if tok < TOKSTART || $$Exca[i+1] == 0 {
-				continue
-			}
-			if len(expected) == cap(expected) {
-				return res
-			}
-			expected = append(expected, tok)
-		}
-
-		// If the default action is to accept or reduce, give up.
-		if $$Exca[i+1] != 0 {
-			return res
-		}
-	}
-
-	for i, tok := range expected {
-		if i == 0 {
-			res += ", expecting "
-		} else {
-			res += " or "
-		}
-		res += $$Tokname(tok)
-	}
-	return res
+	return __yyfmt__.Sprintf("state:%v", s)
 }
 
 func $$lex1(lex $$Lexer, lval *$$SymType) (char, token int) {
@@ -3402,7 +3345,7 @@ out:
 	if token == 0 {
 		token = $$Tok2[1] /* unknown char */
 	}
-	if $$Debug >= 3 {
+	if $$Debug >= 4 {
 		__yyfmt__.Printf("lex %s(%d)\n", $$Tokname(token), uint(char))
 	}
 	return char, token
@@ -3413,15 +3356,57 @@ func $$Parse($$lex $$Lexer) int {
 }
 
 func ($$rcvr *$$ParserImpl) Parse($$lex $$Lexer) int {
+	$$rcvr.tokens = make([][2]int, 0)
+
+	for {
+		char, token := $$lex1($$lex, &$$rcvr.lval)
+		$$rcvr.tokens = append($$rcvr.tokens, [2]int{char, token})
+		if char == 0 {
+			break
+		}
+	}
+
+	if $$Debug >= 3 {
+		__yyfmt__.Print("lex: ")
+		for _, tk := range $$rcvr.tokens {
+			__yyfmt__.Printf("%s ", $$Tokname(tk[1]))
+		}
+		__yyfmt__.Println()
+	}
+
+	maxN := -1
+	for s := 0; s < $$Nstate; s++ {
+		n := $$rcvr.parse(s, -1, 0, map[int]int{})
+		if n > maxN {
+			maxN = n
+		}
+		if $$Debug >= 3 {
+			__yyfmt__.Printf("return: %d\n----------------\n", n)
+		}
+		if maxN == len($$rcvr.tokens)-2 {
+			break
+		}
+	}
+
+	return maxN + 1
+}
+
+func ($$rcvr *$$ParserImpl) parse($$state, pos, depth int, rs map[int]int) int {
 	var $$n int
 	var $$VAL $$SymType
-	var $$Dollar []$$SymType
-	_ = $$Dollar // silence set and not used
-	$$S := $$rcvr.stack[:]
+	var stack [$$InitialStackSize]$$SymType
+	$$S := stack[:]
 
-	Nerrs := 0   /* number of errors */
-	Errflag := 0 /* error recovery flag */
-	$$state := 0
+	initpos := pos
+
+	if $$Debug >= 3 {
+		__yyfmt__.Printf("%sstate: %d, pos: %d, lex: ", strings.Repeat(" ", depth), exprstate, pos)
+		for _, tk := range $$rcvr.tokens {
+			__yyfmt__.Printf("%s ", exprTokname(tk[1]))
+		}
+		__yyfmt__.Println()
+	}
+
 	$$rcvr.char = -1
 	$$token := -1 // $$rcvr.char translated into internal numbering
 	defer func() {
@@ -3432,12 +3417,6 @@ func ($$rcvr *$$ParserImpl) Parse($$lex $$Lexer) int {
 	}()
 	$$p := -1
 	goto $$stack
-
-ret0:
-	return 0
-
-ret1:
-	return 1
 
 $$stack:
 	/* put a state and value onto the stack */
@@ -3454,13 +3433,14 @@ $$stack:
 	$$S[$$p] = $$VAL
 	$$S[$$p].yys = $$state
 
-$$newstate:
 	$$n = $$Pact[$$state]
 	if $$n <= $$Flag {
 		goto $$default /* simple state */
 	}
 	if $$rcvr.char < 0 {
-		$$rcvr.char, $$token = $$lex1($$lex, &$$rcvr.lval)
+		pos++
+		$$rcvr.char = $$rcvr.tokens[pos][0]
+		$$token = $$rcvr.tokens[pos][1]
 	}
 	$$n += $$token
 	if $$n < 0 || $$n >= $$Last {
@@ -3468,93 +3448,33 @@ $$newstate:
 	}
 	$$n = $$Act[$$n]
 	if $$Chk[$$n] == $$token { /* valid shift */
+		if $$Debug >= 3 {
+			__yyfmt__.Printf("%sshift %v in %v\n", strings.Repeat(" ", depth), $$Tokname($$token), $$Statname($$state))
+		}
+
+		if pos == len($$rcvr.tokens)-2 {
+			return pos
+		}
+
 		$$rcvr.char = -1
 		$$token = -1
-		$$VAL = $$rcvr.lval
 		$$state = $$n
-		if Errflag > 0 {
-			Errflag--
-		}
 		goto $$stack
 	}
 
 $$default:
 	/* default state action */
 	$$n = $$Def[$$state]
-	if $$n == -2 {
-		if $$rcvr.char < 0 {
-			$$rcvr.char, $$token = $$lex1($$lex, &$$rcvr.lval)
+	if $$n == -2 || $$n == 0 {
+		if $$token != -1 {
+			pos--
 		}
-
-		/* look through exception table */
-		xi := 0
-		for {
-			if $$Exca[xi+0] == -1 && $$Exca[xi+1] == $$state {
-				break
-			}
-			xi += 2
-		}
-		for xi += 2; ; xi += 2 {
-			$$n = $$Exca[xi+0]
-			if $$n < 0 || $$n == $$token {
-				break
-			}
-		}
-		$$n = $$Exca[xi+1]
-		if $$n < 0 {
-			goto ret0
-		}
-	}
-	if $$n == 0 {
-		/* error ... attempt to resume parsing */
-		switch Errflag {
-		case 0: /* brand new error */
-			$$lex.Error($$ErrorMessage($$state, $$token))
-			Nerrs++
-			if $$Debug >= 1 {
-				__yyfmt__.Printf("%s", $$Statname($$state))
-				__yyfmt__.Printf(" saw %s\n", $$Tokname($$token))
-			}
-			fallthrough
-
-		case 1, 2: /* incompletely recovered error ... try again */
-			Errflag = 3
-
-			/* find a state where "error" is a legal shift action */
-			for $$p >= 0 {
-				$$n = $$Pact[$$S[$$p].yys] + $$ErrCode
-				if $$n >= 0 && $$n < $$Last {
-					$$state = $$Act[$$n] /* simulate a shift of "error" */
-					if $$Chk[$$state] == $$ErrCode {
-						goto $$stack
-					}
-				}
-
-				/* the current p has no shift on "error", pop stack */
-				if $$Debug >= 2 {
-					__yyfmt__.Printf("error recovery pops state %d\n", $$S[$$p].yys)
-				}
-				$$p--
-			}
-			/* there is no state on the stack with an error shift ... abort */
-			goto ret1
-
-		case 3: /* no shift yet; clobber input char */
-			if $$Debug >= 2 {
-				__yyfmt__.Printf("error recovery discards %s\n", $$Tokname($$token))
-			}
-			if $$token == $$EofCode {
-				goto ret1
-			}
-			$$rcvr.char = -1
-			$$token = -1
-			goto $$newstate /* try again in the same state */
-		}
+		return pos
 	}
 
 	/* reduction by production $$n */
 	if $$Debug >= 2 {
-		__yyfmt__.Printf("reduce %v in:\n\t%v\n", $$n, $$Statname($$state))
+		__yyfmt__.Printf("%sreduce %v in %v\n", strings.Repeat(" ", depth), $$n, $$Statname($$state))
 	}
 
 	$$nt := $$n
@@ -3569,11 +3489,62 @@ $$default:
 		copy(nyys, $$S)
 		$$S = nyys
 	}
-	$$VAL = $$S[$$p+1]
 
 	/* consult goto table to find next state */
 	$$n = $$R1[$$n]
 	$$g := $$Pgo[$$n]
+
+	if $$p < 0 {
+		var nrs map[int]int
+		if pos == initpos {
+			nrs = rs
+			nrs[$$state] = 1
+			defer delete(nrs, $$state)
+		} else {
+			nrs = map[int]int{}
+		}
+		if $$token != -1 {
+			pos--
+		}
+		if pos == len($$rcvr.tokens)-2 {
+			return pos
+		}
+		maxN := pos
+		for s := 0; s < $$Nstate; s++ {
+			$$j := $$g + s + 1
+			if $$j < $$Last {
+				state := $$Act[$$j]
+				if _, exist := rs[state]; exist {
+					continue
+				}
+				if $$Chk[state] != -$$n {
+					continue
+				}
+				n := $$rcvr.parse(state, pos, depth+4, rs)
+				if n > maxN {
+					maxN = n
+				}
+				if $$Debug >= 3 {
+					__yyfmt__.Printf("%sreturn: %d\n", strings.Repeat(" ", depth+4), n)
+				}
+				if n == len($$rcvr.tokens)-2 {
+					break
+				}
+			}
+		}
+		state := $$Act[exprg]
+		if _, exist := rs[state]; !exist {
+			n := $$rcvr.parse(state, pos, depth+4, rs)
+			if n > maxN {
+				maxN = n
+			}
+			if $$Debug >= 3 {
+				__yyfmt__.Printf("%sreturn: %d\n", strings.Repeat(" ", depth+4), n)
+			}
+		}
+		return maxN
+	}
+
 	$$j := $$g + $$S[$$p].yys + 1
 
 	if $$j >= $$Last {
@@ -3586,6 +3557,9 @@ $$default:
 	}
 	// dummy call; replaced with literal code
 	$$run()
+	if $$nt == 1 {
+		return pos - 1
+	}
 	goto $$stack /* stack new state and value */
 }
 `
