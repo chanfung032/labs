@@ -3400,9 +3400,9 @@ func ($$rcvr *$$ParserImpl) parse($$state, pos, depth int, rs map[int]int) int {
 	initpos := pos
 
 	if $$Debug >= 3 {
-		__yyfmt__.Printf("%sstate: %d, pos: %d, lex: ", strings.Repeat(" ", depth), exprstate, pos)
+		__yyfmt__.Printf("%sstate: %d, pos: %d, lex: ", strings.Repeat(" ", depth), $$state, pos)
 		for _, tk := range $$rcvr.tokens {
-			__yyfmt__.Printf("%s ", exprTokname(tk[1]))
+			__yyfmt__.Printf("%s ", $$Tokname(tk[1]))
 		}
 		__yyfmt__.Println()
 	}
@@ -3465,7 +3465,33 @@ $$stack:
 $$default:
 	/* default state action */
 	$$n = $$Def[$$state]
-	if $$n == -2 || $$n == 0 {
+	if $$n == -2 {
+		if $$rcvr.char < 0 {
+			pos++
+			$$rcvr.char = $$rcvr.tokens[pos][0]
+			$$token = $$rcvr.tokens[pos][1]
+		}
+
+		/* look through exception table */
+		xi := 0
+		for {
+			if $$Exca[xi+0] == -1 && $$Exca[xi+1] == $$state {
+				break
+			}
+			xi += 2
+		}
+		for xi += 2; ; xi += 2 {
+			$$n = $$Exca[xi+0]
+			if $$n < 0 || $$n == $$token {
+				break
+			}
+		}
+		$$n = $$Exca[xi+1]
+		if $$n < 0 {
+			return pos-1
+		}
+	}
+	if $$n == 0 {
 		if $$token != -1 {
 			pos--
 		}
@@ -3495,13 +3521,9 @@ $$default:
 	$$g := $$Pgo[$$n]
 
 	if $$p < 0 {
-		var nrs map[int]int
-		if pos == initpos {
-			nrs = rs
-			nrs[$$state] = 1
-			defer delete(nrs, $$state)
-		} else {
-			nrs = map[int]int{}
+		if pos == initpos || (pos == initpos + 1 && $$token != -1) {
+			rs[$$state] = 1
+			defer delete(rs, $$state)
 		}
 		if $$token != -1 {
 			pos--
@@ -3532,7 +3554,7 @@ $$default:
 				}
 			}
 		}
-		state := $$Act[exprg]
+		state := $$Act[$$g]
 		if _, exist := rs[state]; !exist {
 			n := $$rcvr.parse(state, pos, depth+4, rs)
 			if n > maxN {
