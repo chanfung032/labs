@@ -3414,7 +3414,7 @@ func ($$rcvr *$$ParserImpl) parse($$state, pos, depth int, rs map[int]int) int {
 
 	if $$Debug >= 3 {
 		__yyfmt__.Printf("%sstate: %d, pos: %d, lex: ", strings.Repeat(" ", depth), $$state, pos)
-		for _, tk := range $$rcvr.tokens {
+		for _, tk := range $$rcvr.tokens[pos+1:] {
 			__yyfmt__.Printf("%s ", $$Tokname(tk[1]))
 		}
 		__yyfmt__.Println()
