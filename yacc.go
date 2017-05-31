@@ -3376,6 +3376,19 @@ func ($$rcvr *$$ParserImpl) Parse($$lex $$Lexer) int {
 
 	maxN := -1
 	for s := 0; s < $$Nstate; s++ {
+		$$n := $$Pact[s]
+		if $$n <= $$Flag {
+			continue
+		}
+		$$n += $$rcvr.tokens[0][1]
+		if $$n < 0 || $$n >= $$Last {
+			continue
+		}
+		$$n = $$Act[$$n]
+		if $$Chk[$$n] != $$rcvr.tokens[0][1] { /* valid shift */
+			continue
+		}
+
 		n := $$rcvr.parse(s, -1, 0, map[int]int{})
 		if n > maxN {
 			maxN = n
