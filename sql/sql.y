@@ -133,16 +133,9 @@ package main
 %type <str> charset
 %type <convertType> convert_type
 %type <str> show_statement_type
-%start any_command
+%start command
 
 %%
-
-any_command:
-  command semicolon_opt
-
-semicolon_opt:
-/*empty*/
-| ';'
 
 command:
   select_statement
