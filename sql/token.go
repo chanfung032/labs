@@ -56,7 +56,7 @@ type Tokenizer struct {
 // NewStringTokenizer creates a new Tokenizer for the
 // sql string.
 func NewStringTokenizer(sql string) *Tokenizer {
-	return &Tokenizer{InStream: strings.NewReader(sql), AllowComments: true}
+	return &Tokenizer{InStream: strings.NewReader(sql)}
 }
 
 // keywords is a map of mysql keywords that fall into two categories:
