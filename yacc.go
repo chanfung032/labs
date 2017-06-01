@@ -710,6 +710,12 @@ outer:
 	}
 	fmt.Fprintf(ftable, "}\n")
 
+	fmt.Fprintf(ftable, "var %sNtermnames = [...]string{\n", prefix)
+	for i := 1; i <= nnonter; i++ {
+		fmt.Fprintf(ftable, "\t%q,\n", nontrst[i].name)
+	}
+	fmt.Fprintf(ftable, "}\n")
+
 	// put out names of states.
 	// commented out to avoid a huge table just for debugging.
 	// re-enable to have the names in the binary.
@@ -3307,6 +3313,15 @@ func $$Tokname(c int) string {
 	return __yyfmt__.Sprintf("tok:%v", c)
 }
 
+func $$Ntermname(c int) string {
+	if c >= 1 && c-1 < len($$Ntermnames) {
+		if $$Ntermnames[c-1] != "" {
+			return $$Ntermnames[c-1]
+		}
+	}
+	return __yyfmt__.Sprintf("tok:%v", c)
+}
+
 func $$Statname(s int) string {
 	if s >= 0 && s < len($$Statenames) {
 		if $$Statenames[s] != "" {
@@ -3413,7 +3428,7 @@ func ($$rcvr *$$ParserImpl) parse($$state0, $$state, pos, depth int, rs map[int]
 	initpos := pos
 
 	if $$Debug >= 3 {
-		__yyfmt__.Printf("%sstate: %d, pos: %d, lex: ", strings.Repeat(" ", depth), $$state, pos)
+		__yyfmt__.Printf("%sparse(state: %d, %d, pos: %d), lex: ", strings.Repeat(" ", depth), $$state0, $$state, pos)
 		for _, tk := range $$rcvr.tokens[pos+1:] {
 			__yyfmt__.Printf("%s ", $$Tokname(tk[1]))
 		}
@@ -3431,7 +3446,7 @@ func ($$rcvr *$$ParserImpl) parse($$state0, $$state, pos, depth int, rs map[int]
 	$$p := -1
 	if $$state0 != -1 {
 		$$p++
-		$$S[$$p].$$s = $$state0
+		$$S[$$p].yys = $$state0
 	}
 
 	goto $$stack
@@ -3467,7 +3482,7 @@ $$stack:
 	$$n = $$Act[$$n]
 	if $$Chk[$$n] == $$token { /* valid shift */
 		if $$Debug >= 3 {
-			__yyfmt__.Printf("%sshift %v in %v\n", strings.Repeat(" ", depth), $$Tokname($$token), $$Statname($$state))
+			__yyfmt__.Printf("%sshift %v <- %v\n", strings.Repeat(" ", depth), $$Statname($$state), $$Tokname($$token))
 		}
 
 		if pos == len($$rcvr.tokens)-2 {
@@ -3518,7 +3533,7 @@ $$default:
 
 	/* reduction by production $$n */
 	if $$Debug >= 2 {
-		__yyfmt__.Printf("%sreduce %v in %v\n", strings.Repeat(" ", depth), $$n, $$Statname($$state))
+		__yyfmt__.Printf("%sreduce %v -> %v by %v\n", strings.Repeat(" ", depth), $$Statname($$state), $$Ntermname($$R1[$$n]), $$n)
 	}
 
 	$$nt := $$n
