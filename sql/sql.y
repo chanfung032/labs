@@ -430,7 +430,7 @@ value_expression:
 | '-'  value_expression %prec UNARY
 | '~'  value_expression
 | '!' value_expression %prec UNARY
-| INTERVAL value_expression sql_id
+// | INTERVAL value_expression sql_id
 | function_call_generic
 | function_call_keyword
 | function_call_nonkeyword
