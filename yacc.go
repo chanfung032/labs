@@ -3389,7 +3389,7 @@ func ($$rcvr *$$ParserImpl) Parse($$lex $$Lexer) int {
 			continue
 		}
 
-		n := $$rcvr.parse(s, -1, 0, map[int]int{})
+		n := $$rcvr.parse(-1, s, -1, 0, map[int]int{})
 		if n > maxN {
 			maxN = n
 		}
@@ -3404,7 +3404,7 @@ func ($$rcvr *$$ParserImpl) Parse($$lex $$Lexer) int {
 	return maxN + 1
 }
 
-func ($$rcvr *$$ParserImpl) parse($$state, pos, depth int, rs map[int]int) int {
+func ($$rcvr *$$ParserImpl) parse($$state0, $$state, pos, depth int, rs map[int]int) int {
 	var $$n int
 	var $$VAL $$SymType
 	var stack [$$InitialStackSize]$$SymType
@@ -3429,6 +3429,11 @@ func ($$rcvr *$$ParserImpl) parse($$state, pos, depth int, rs map[int]int) int {
 		$$token = -1
 	}()
 	$$p := -1
+	if $$state0 != -1 {
+		$$p++
+		$$S[$$p].$$s = $$state0
+	}
+
 	goto $$stack
 
 $$stack:
@@ -3536,7 +3541,6 @@ $$default:
 	if $$p < 0 {
 		if pos == initpos || (pos == initpos + 1 && $$token != -1) {
 			rs[$$state] = 1
-			defer delete(rs, $$state)
 		}
 		if $$token != -1 {
 			pos--
@@ -3547,34 +3551,32 @@ $$default:
 		maxN := pos
 		for s := 0; s < $$Nstate; s++ {
 			$$j := $$g + s + 1
-			if $$j < $$Last {
-				state := $$Act[$$j]
-				if _, exist := rs[state]; exist {
-					continue
-				}
+
+			var state int
+			if $$j >= $$Last {
+				state = $$Act[$$g]
+				continue
+			} else {
+				state = $$Act[$$j]
 				if $$Chk[state] != -$$n {
+					state = $$Act[$$g]
 					continue
-				}
-				n := $$rcvr.parse(state, pos, depth+4, rs)
-				if n > maxN {
-					maxN = n
-				}
-				if $$Debug >= 3 {
-					__yyfmt__.Printf("%sreturn: %d\n", strings.Repeat(" ", depth+4), n)
-				}
-				if n == len($$rcvr.tokens)-2 {
-					break
 				}
 			}
-		}
-		state := $$Act[$$g]
-		if _, exist := rs[state]; !exist {
-			n := $$rcvr.parse(state, pos, depth+4, rs)
+
+			if _, exist := rs[state]; exist {
+				continue
+			}
+
+			n := $$rcvr.parse(s, state, pos, depth+4, rs)
 			if n > maxN {
 				maxN = n
 			}
 			if $$Debug >= 3 {
 				__yyfmt__.Printf("%sreturn: %d\n", strings.Repeat(" ", depth+4), n)
+			}
+			if n == len($$rcvr.tokens)-2 {
+				break
 			}
 		}
 		return maxN
