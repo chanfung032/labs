@@ -1,8 +1,0 @@
-#!/bin/bash
-
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 minute(s)"
-    exit 1
-fi
-
-sleep $1m && notify 通知 吃饭了啦。。。。。&
