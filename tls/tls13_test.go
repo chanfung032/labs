@@ -15,7 +15,6 @@ func TestHTTPS(t *testing.T) {
 	tlsConn := &TLS13Conn{Conn: c}
 	tlsConn.Handshake()
 	tlsConn.Write([]byte("GET / HTTP/1.1\r\nHost: www.cloudflare.com\r\n\r\n"))
-	tlsConn.Read()
 	resp := tlsConn.Read()
 	fmt.Printf("%s\n", resp)
 	if !bytes.HasPrefix(resp, []byte("HTTP/1.1 200 OK")) {

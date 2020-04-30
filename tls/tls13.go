@@ -42,6 +42,7 @@ func (c *TLS13Conn) Handshake() {
 	fmt.Printf("clientPrivateKey: %x\nclientPublicKey: %x\n", clientPrivateKey, clientPublicKey)
 
 	// ⇉ 发送 ClientHello
+	// TODO: SNI support
 	clientHello := hex2byte(`16 03 01 00 ca 01 00 00 c6 03 03 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f 20 e0 e1 e2 e3 e4 e5 e6 e7 e8 e9 ea eb ec ed ee ef f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 fa fb fc fd fe ff 00 06 13 01 13 02 13 03 01 00 00 77 00 00 00 18 00 16 00 00 13 65 78 61 6d 70 6c 65 2e 75 6c 66 68 65 69 6d 2e 6e 65 74 00 0a 00 08 00 06 00 1d 00 17 00 18 00 0d 00 14 00 12 04 03 08 04 04 01 05 03 08 05 05 01 08 06 06 01 02 01 00 33 00 26 00 24 00 1d 00 20 35 80 72 d6 36 58 80 d1 ae ea 32 9a df 91 21 38 38 51 ed 21 a2 8e 3b 75 e9 65 d0 d2 cd 16 62 54 00 2d 00 02 01 01 00 2b 00 03 02 03 04`)
 	copy(clientHello[162:194], clientPublicKey)
 	c.Conn.Write(clientHello)
@@ -134,10 +135,16 @@ func (c *TLS13Conn) Handshake() {
 }
 
 func (c *TLS13Conn) Read() []byte {
-	resp := c.readRecord()
-	plaintext := aes128gcmDecrypt(c.serverApplicationIV, c.serverRecordNum, c.serverApplicationKey, resp[:5], resp[5:])
-	c.serverRecordNum += 1
-	return plaintext
+	for {
+		resp := c.readRecord()
+		plaintext := aes128gcmDecrypt(c.serverApplicationIV, c.serverRecordNum, c.serverApplicationKey, resp[:5], resp[5:])
+		c.serverRecordNum += 1
+		if plaintext[len(plaintext)-1] == 0x17 {
+			return plaintext[:len(plaintext)-1]
+		} else {
+			fmt.Printf("!application data: %x\n", plaintext)
+		}
+	}
 }
 
 func (c *TLS13Conn) Write(data []byte) {
