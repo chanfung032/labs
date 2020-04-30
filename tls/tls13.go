@@ -97,6 +97,8 @@ func (c *TLS13Conn) Handshake() {
 	cert, _ := x509.ParseCertificate(certificate)
 	fmt.Printf("Subject: %s\nIssuer: %s\nDNS Names: %v\n", cert.Subject, cert.Issuer, cert.DNSNames)
 
+	// TODO: 验证 ServerHandshakeFinished 中的 finishedHash
+
 	// ÷ 计算 Application Keys
 	handshakeHash := SHA256(clientHello[5:], serverHello[5:], decrypted[:len(decrypted)-1])
 	derivedSecret = HkdfExpandLabel(handshakeSecret, "derived", emptyHash, 32)
@@ -142,6 +144,7 @@ func (c *TLS13Conn) Read() []byte {
 		if plaintext[len(plaintext)-1] == 0x17 {
 			return plaintext[:len(plaintext)-1]
 		} else {
+			// 有可能是 New Session Ticket, etc.
 			fmt.Printf("!application data: %x\n", plaintext)
 		}
 	}
