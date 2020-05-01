@@ -80,9 +80,9 @@ func (c *TLS13Conn) Handshake() {
 	// --- 明文↑ 密文↓ 分割线 ---
 
 	// ⇇ {Encrypted Extensions, Certificate, Certificate Verify, Handshake Finished}
-	wrapper := c.readRecord()
-	decrypted := aes128gcmDecrypt(serverHandshakeIV, 0, serverHandshakeKey, wrapper[:5], wrapper[5:])
-	fmt.Printf("decrypted %x\n", decrypted)
+	record := c.readRecord()
+	msgs := aes128gcmDecrypt(serverHandshakeIV, 0, serverHandshakeKey, record[:5], record[5:])
+	fmt.Printf("msgs %x\n", msgs)
 
 	// TODO: 验证对端是否确实是发送过来的证书的所有者
 	// 验证方法：
@@ -90,17 +90,17 @@ func (c *TLS13Conn) Handshake() {
 	//   使用证书的公钥解密并和实际的握手包签名对比即可验证对端确实是发送过来的证书的所有者
 
 	// TODO: 验证证书是否可信
-	encryptedExtensionsLength := bytes2length(decrypted[1:4])
+	encryptedExtensionsLength := bytes2length(msgs[1:4])
 	fmt.Println(encryptedExtensionsLength)
-	certficateLength := bytes2length(decrypted[4+encryptedExtensionsLength+8 : 4+encryptedExtensionsLength+8+3])
-	certificate := decrypted[4+encryptedExtensionsLength+8+3 : 4+encryptedExtensionsLength+8+3+certficateLength]
+	certficateLength := bytes2length(msgs[4+encryptedExtensionsLength+8 : 4+encryptedExtensionsLength+8+3])
+	certificate := msgs[4+encryptedExtensionsLength+8+3 : 4+encryptedExtensionsLength+8+3+certficateLength]
 	cert, _ := x509.ParseCertificate(certificate)
 	fmt.Printf("Subject: %s\nIssuer: %s\nDNS Names: %v\n", cert.Subject, cert.Issuer, cert.DNSNames)
 
 	// TODO: 验证 ServerHandshakeFinished 中的 finishedHash
 
 	// ÷ 计算 Application Keys
-	handshakeHash := SHA256(clientHello[5:], serverHello[5:], decrypted[:len(decrypted)-1])
+	handshakeHash := SHA256(clientHello[5:], serverHello[5:], msgs[:len(msgs)-1])
 	derivedSecret = HkdfExpandLabel(handshakeSecret, "derived", emptyHash, 32)
 	fmt.Printf("%x\n", derivedSecret)
 	masterSecret := HkdfExtract(derivedSecret, hex2byte(`0000000000000000000000000000000000000000000000000000000000000000`))
