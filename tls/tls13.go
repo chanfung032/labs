@@ -116,7 +116,7 @@ func (c *TLS13Conn) Handshake() {
 	fmt.Printf("clientApplicationIV %x\n", c.clientApplicationIV)
 	fmt.Printf("serverApplicationIV %x\n", c.serverApplicationIV)
 
-	// ⇉ Client Change Cipher Spec 兼容
+	// ⇉ Client Change Cipher Spec
 	c.Conn.Write(hex2byte(`14 03 03 00 01 01`))
 
 	// ⇉ Client Handshake Finished
@@ -153,12 +153,14 @@ func (c *TLS13Conn) Read() []byte {
 func (c *TLS13Conn) Write(data []byte) {
 	var b cryptobyte.Builder
 	b.AddBytes([]byte{0x17, 0x03, 0x03})
+	// Payload 长度 = 密文长度（=明文长度）+ 消息类型（1字节）+ 16个字节的Auth Tag（用以校验密文信息）
 	b.AddUint16(uint16(len(data) + 1 + 16))
 	recordHeader, _ := b.Bytes()
 	fmt.Printf("record header: %x\n", recordHeader)
 
 	payload := make([]byte, len(data)+1)
 	copy(payload, data)
+	// 最后一个字节是消息类型，0x17 -> Application Data
 	payload[len(payload)-1] = 0x17
 	fmt.Printf("payload: %x\n", payload)
 	encrypted := aes128gcmEncrypt(c.clientApplicationIV, c.clientRecordNum, c.clientApplicationKey, recordHeader, payload)
@@ -244,6 +246,7 @@ func buildIV(iv []byte, seq int) []byte {
 	return r
 }
 
+// 返回密文+16字节的Auth Tag
 func aes128gcmEncrypt(iv []byte, seq int, key, aad, plaintext []byte) []byte {
 	block, err := aes.NewCipher(key)
 	if err != nil {
