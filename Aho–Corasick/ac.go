@@ -5,11 +5,13 @@ import "fmt"
 const debug = false
 
 type Node struct {
-	children    map[byte]*Node
+	depth    int
+	children map[byte]*Node
+	fail     *Node
+	// 如果 match，则当前节点在 output 集合中
+	// matchSuffix 以及 matchSuffix.matchSuffix ... 构成一个链表，指向 output 集合中剩余的节点
 	match       bool
-	fail        *Node
 	matchSuffix *Node
-	depth       int
 }
 
 func Compile(words []string) *Node {
