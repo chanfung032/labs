@@ -1,0 +1,128 @@
+# 日志输入源，目前仅支持 kafka
+input:
+  zookeeper: 127.0.0.1:2181/
+  topic: web-log
+
+# URL Pattern学习相关配置
+# interval 是学习间隔时间，url_count 是学习一次需要的 url 数。
+learn:
+  interval: 1800
+  url_count: 1000
+
+# 特征计算的间隔和窗口大小，单位都是秒。
+# 比如下面的配置会让 vdun 每 5 秒计算一次每个 ip 5*12 秒内所有请求的特征。
+detect:
+  interval: 5
+  window_length: 12
+
+# 计算出来的特征如下，风险检测的规则表达式可以引用这些变量。
+#
+# {
+#     "domain": "newahtv.bj116.com",
+#     "ip": "221.204.169.151",
+#      // 该 ip 的 总pv
+#     "pv": 11,
+#
+#      // 排名第一的 path/referer/user_agent 的 pv
+#     "pv_most_path": 5,
+#     "pv_most_refer": 11,
+#     "pv_most_user_agent": 11,
+#     "pv_most_request_pattern": 3,
+#
+#      // 排名第一的 path/referer/user_agent 的 pv 占总 pv 的比例。
+#     "ratio_most_path": 0.454,
+#     "ratio_most_refer": 1,
+#     "ratio_most_user_agent": 1,
+#     "ratio_most_request_pattern": 0.4,
+#
+#     // path/referer/user_agent 的比例的标准差
+#     "ratio_std_path": 0.5,
+#     "ratio_std_refer": 1,
+#     "ratio_std_user_agent": 0.0,
+#     "ratio_std_request_pattern": 0.0,
+#
+#      // uniq_xxx, 出现的不同 path/referer/user_agent 的个数。
+#     "uniq_path": 3,
+#     "uniq_refer": 1,
+#     "uniq_user_agent": 1,
+#     "uniq_request_pattern": 3,
+#
+#      // 该计算周期的结束时间
+#     "@timestamp": "2015-12-15T10:34:08+0800",
+#
+#      // most_xxx 描述了该周期内主要的访问行为, 计算方法都一样, 以 path 为例说明:
+#      // 1. 计算每个 path 的pv。
+#      // 2. 按 pv 倒序排列。
+#      // 4. 计算每个 path 的 pv 占总 pv 的百分比 ratio 。
+#      // 5. 保留最多的 5 个。
+#     "most_path": [
+#         {
+#             "name": "/capi3/activity/checkaward200.php",
+#             "pv": 5,
+#             "ratio": 0.454
+#         },
+#         {
+#             "name": "/capi3/activity/gualist200.php",
+#             "pv": 4,
+#             "ratio": 0.363
+#         },
+#         {
+#             "name": "/capi3/activity/guaclick200.php",
+#             "pv": 2,
+#             "ratio": 0.181
+#         }
+#     ],
+#
+#      // 主要的referer
+#     "most_refer": [
+#         {
+#             "name": "-",
+#             "pv": 11,
+#             "ratio": 1
+#         }
+#     ],
+#
+#      // 主要的user-agent
+#     "most_user_agent": [
+#         {
+#             "name": "-",
+#             "pv": 11,
+#             "ratio": 1
+#         }
+#     ],
+#
+#     // 主要的 url pattern
+#     "most_request_pattern": [
+#       {
+#           "name": "/api/*.php?app_code=*&app_ver=*&channel_id=*&device_token=*&device_type=*",
+#           "pv": 10,
+#           "ratio": 1
+#       }
+#     ]
+# }
+#
+#  风险规则判定表达式的写法可以参考以下示例，详细语法参见：https://commons.apache.org/proper/commons-jexl/reference/syntax.html
+policy:
+  - (pv > 120 and ratio_most_path > 0.9) or (pv > 30 and ratio_most_path > 0.99)
+
+# 对于风险为 high 的 ip，拦截模块会依次调用以下 action，目前支持 http 回调。
+# http 回调的参数可以通过模版自定义，模版中可以引用以下变量：
+#
+#  - domain: 要拦截的域名。
+#  - ips: 要拦截的 ip 列表，类型为 list。
+#
+# 模版语法见：http://jinja.pocoo.org/docs/2.9/templates/
+action:
+  - type: http
+    url: http://b10ck.vdun.com/block/these/ips?domain={{domain}}&ips={{ips | join(',')}}
+  - type: http
+    method: POST
+    url: http://b10ck.vdun.com
+    data: |
+      {
+        "domain": "{{domain}}",
+        "timeout": 86400,
+        "ips": [
+           "{{ips | join('","')}}"
+         ]
+      }
