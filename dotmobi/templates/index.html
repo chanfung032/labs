@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Mobi电子书查找</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="12879本Kindle英文原版电子书合集查找">
+        <meta name="author" content="Dndx (idndx.com)">
+
+        <link href="http://lib.sinaapp.com/js/bootstrap/latest/css/bootstrap.min.css" rel="stylesheet">
+
+        <style type="text/css">
+            body{margin:0; padding:0; width:100%; height:100%; }  
+            .container{position:absolute; top:50%; left:50%; margin-top:-250px; margin-left:-400px; width:800px; height:500px; text-align:center; }  
+            #keyword{height:39px; width:630px; font-size:28px; margin-bottom:0px; line-height:28px; }
+            div.alert{margin-top:1em; }
+            h1 a, h1 a:hover{color: black;}
+            .popover-inner{width: 100px; }
+            div.result ul{list-style-type:none; text-align:left; /*font-size: 20px;*/ }
+            /*div.result ul li{line-height:25px; } */
+            div.result a:link{color: #333;}
+            div.result a:hover{color: #005580;}
+        </style>
+        <!--[if lt IE 9]>
+            <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+
+    </head>
+
+    <body>
+
+        <div class="container">
+            <h1><a href="{{ url_for('index') }}" title="回首页">Mobi电子书查找</a></h1><br /><br />
+            <input placeholder="请输入书名或者作者名" type="text" id="keyword" />
+            <input type="button" class="btn btn-large btn-primary" value="查找" />
+            <div class="url alert alert-error hide">
+                <b>请输入书名或者作者名</b><br />
+                例：<a class="example" href="#">Arthur Conan Doyle</a>, <a class="example" href="#">A Dance with Dragons</a><br />
+            </div>
+
+            {% if results is defined %}
+            <hr />
+            {% if results %}
+            <div class="result">
+                <ul>
+            {% for x in results %}
+                    <li style="padding-left:2em; "><a href="{{ book_url(x) }}">{{ x.highlights('author')|safe or x['author'] }} - {{ x.highlights('title')|safe or x['title'] }}</a></li>
+            {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <div class="url alert alert-error">
+                <b>Ooops, 没有找到。</b><br />
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <hr />
+            <ul>
+                <!--
+                <li>本工具完全为娱乐所作，作者不对使用其可能产生的任何后果承担任何责任。</li>
+                -->
+                <li>所有的mobi电子书来自<a target="_blank" href="https://s.yunio.com/t8b4vw">【资料魔方】12879本Kindle英文原版电子书合集+mobi+共25G</a>，你也可以直接使用bt下载（<a href="static/12879本Kindle英文原版电子书合集.zip">种子</a>）</li>
+                <li>您可以将<a id="bookmark" href="javascript:void((function(){var e=document.createElement('script');e.setAttribute('src','http://dotmobi.sinaapp.com/static/douban.js');document.body.appendChild(e);})())">dotmobi电子书查找</a>加入您的书签栏，这样在豆瓣读书页面直接点击即可打开搜索页面。</li>
+            </ul>
+
+        <footer>
+        Built by: <a href="https://github.com/chanfung032">Alan Chan</a>, using <a href="http://python.org/" target="_blank">Python</a>, <a href="http://flask.pocoo.org/" target="_blank">Flask</a>, <a href="http://pythonhosted.org/Whoosh/" target="_blank">Whoosh</a>. Debug: {{ 'On' if config['debug'] else 'Off' }}, Page rendered in {{ render_time }} second(s).<br />
+        <a href="http://validator.w3.org/check?uri=referer">Valid HTML5</a><br />
+        <a href="http://sae.sina.com.cn" target="_blank"><img src="http://static.sae.sina.com.cn/image/poweredby/120X33_transparent.gif" title="Powered by Sina App Engine"></a>
+        </footer>
+        </div> <!-- /container -->
+        
+        <script type="text/javascript" src="http://lib.sinaapp.com/js/jquery/1.7.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://lib.sinaapp.com/js/bootstrap/latest/js/bootstrap.min.js"></script>
+        <!--
+        <script type="text/javascript" src="{{ url_for('static', filename='ZeroClipboard.js') }}"></script>
+        -->
+        <script type="text/javascript">
+            $(function(){
+                    $('a').tooltip({'placement' : 'right'});
+                    /*
+                    $('a.download').click(function(){
+                        var that = this;
+                        $('div.alert.download').fadeOut('slow', function(){
+                            $(that).parent().parent().after($('div.alert.download')).parent().find('div.alert').fadeIn('slow');
+                        });
+                        return false;
+                    });
+                    */
+                    $('a.example').click(function(){
+                        $('#keyword').val($(this).text());
+                        return false;
+                    });
+                    /* $('#keyword').focus(); */
+                    var submit = function() {
+                        var keyword = $.trim($('#keyword').val());
+                        if (keyword){
+                            $('input[type=button]').prop('disabled', true);
+                            $('input[type=button]').val('Working...');
+                            window.location.replace('/search/' + keyword);
+                            return false;
+                        }
+                        $('div.alert.url').fadeIn('slow');
+                        window.setTimeout(function(){
+                            $('div.alert.url').fadeOut(2000);
+                        }, 2000);
+                        return false;
+                    };
+                    $('input').keyup(function(event){if (event.which == 13) submit()});
+                    $('input[type=button]').click(submit);
+                    $('#bookmark').click(function(){
+                        alert('请右键将此链接加入书签工具栏。');
+                        return false;
+                    });
+            });
+        </script>
+
+  </body>
+</html>
+
