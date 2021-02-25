@@ -1,0 +1,4 @@
+web1: nc -l 11111
+web2: go run web.go -a :11112
+web3: bundle exec ruby web.rb
+web4: sleep 90
