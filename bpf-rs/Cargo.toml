@@ -1,0 +1,15 @@
+[package]
+name = "xdp-pass"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.88"
+libbpf-cargo = "0.24.4"
+libbpf-rs = "0.24.4"
+
+[dev-dependencies]
+libbpf-cargo = "0.24.4"
+
+[build-dependencies]
+libbpf-cargo = "0.24.4"
